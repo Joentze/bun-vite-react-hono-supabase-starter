@@ -1,9 +1,11 @@
 import { Hono } from "hono";
+import { projects } from "./routes/base";
 
-const app = new Hono();
-app.get("/", (c) => c.text("Hello Bun!"));
+const api = new Hono();
+api.basePath("/api");
+api.route("/projects", projects.default);
 
 export default {
   port: 5174,
-  fetch: app.fetch,
+  fetch: api.fetch,
 };

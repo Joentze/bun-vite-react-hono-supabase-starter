@@ -8,6 +8,8 @@
     "dev:client": "bunx vite",
     "dev:server": "bun run server/index.ts",
     "build": "tsc -b && vite build",
+    "test:server": "vitest",
+    "test:server:coverage": "vitest run --coverage",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -62,5 +64,10 @@
     "typescript-eslint": "^8.30.1",
     "vite": "^6.3.5",
     "vitest": "^3.2.4"
+  },
+  "imports": {
+    "#routes/*": "./server/routes/*",
+    "#middleware/*": "./server/middleware/*",
+    "#utils/*": "./server/utils/*"
   }
 }
