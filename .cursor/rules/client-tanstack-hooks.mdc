@@ -9,8 +9,8 @@ alwaysApply: false
 Create TanStack Query hooks for Supabase CRUD operations in the `./src/hooks` folder. Each hook file should correspond to a database entity/table and provide comprehensive CRUD functionality.
 
 ## File Structure
-- Organize hooks by database entity/table: `./src/hooks/use[EntityName].ts`
-- Example: `./src/hooks/useProjects.ts`, `./src/hooks/useUsers.ts`
+- Organize hooks by database entity/table: `./src/hooks/use-[EntityName].ts`
+- Example: `./src/hooks/useProjects.ts`, `./src/hooks/use-users.ts`
 - For hooks with inner joins, place them in the most appropriate entity file
 
 ## Required Imports

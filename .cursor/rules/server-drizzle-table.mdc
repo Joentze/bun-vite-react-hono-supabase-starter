@@ -1,0 +1,241 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Drizzle ORM Table Creation Rules
+
+## Overview
+Create Drizzle ORM table definitions in the `./server/db/schema/` directory. Each table should be in its own file with proper naming conventions, imports, and structure.
+
+## File Naming Convention
+- Single word tables: `users.ts`, `products.ts`
+- Multi-word tables: Use hyphenated naming: `knowledge-base.ts`, `user-roles.ts`, `auth-users.ts`
+- File names should match the table concept but be hyphenated for readability
+
+## Table Naming Convention
+- **Database table names**: Use `snake_case` (e.g., `knowledge_base`, `user_roles`, `auth_users`)
+- **TypeScript variable names**: Use `camelCase` (e.g., `knowledgeBase`, `userRoles`, `authUsers`)
+
+## Required Imports Structure
+```typescript
+import { relations } from 'drizzle-orm';
+import {
+  pgTable,
+  timestamp,
+  text,
+  uuid,
+  integer,
+  boolean,
+  varchar,
+  foreignKey,
+  // Add other column types as needed
+} from 'drizzle-orm/pg-core';
+
+// Import related tables for foreign keys
+import { authUsers } from './auth-users';
+import { branches } from './branches';
+
+// Always import DEFAULT_COLUMNS
+import { DEFAULT_COLUMNS } from '../utils/columns';
+```
+
+## Basic Table Structure Template
+```typescript
+export const tableName = pgTable(
+  'table_name', // snake_case database table name
+  {
+    ...DEFAULT_COLUMNS, // Always spread DEFAULT_COLUMNS first
+    
+    // Additional columns here
+    deletedAt: timestamp('deleted_at', { precision: 3, withTimezone: true }),
+    name: text('name').notNull(),
+    email: text('email').notNull().unique(),
+    isActive: boolean('is_active').default(true),
+    
+    // Foreign key columns
+    userId: uuid('user_id').references(() => users.id),
+    branchId: text('branch_id').references(() => branches.id),
+  },
+  (table) => [
+    // Additional constraints (optional)
+    foreignKey({
+      columns: [table.userId],
+      foreignColumns: [users.id],
+      name: 'table_name_user_id_fk',
+    }).onDelete('cascade'),
+  ],
+);
+```
+
+## DEFAULT_COLUMNS Usage
+Always use `...DEFAULT_COLUMNS` as the first property in your table definition:
+```typescript
+{
+  ...DEFAULT_COLUMNS, // Provides: id (uuid), createdAt, updatedAt
+  // Your additional columns...
+}
+```
+
+## Column Types Reference
+```typescript
+// Text columns
+name: text('name').notNull(),
+email: text('email').notNull().unique(),
+description: text('description'),
+
+// Varchar with length
+title: varchar('title', { length: 255 }).notNull(),
+
+// UUID columns (for foreign keys)
+userId: uuid('user_id').references(() => users.id),
+authUserId: uuid('auth_user_id').unique().notNull(),
+
+// Boolean columns
+isActive: boolean('is_active').default(true),
+isDeleted: boolean('is_deleted').default(false),
+
+// Integer columns
+count: integer('count').default(0),
+order: integer('order'),
+
+// Timestamps
+deletedAt: timestamp('deleted_at', { precision: 3, withTimezone: true }),
+publishedAt: timestamp('published_at', { withTimezone: true }),
+```
+
+## Foreign Key Constraints
+### Inline References (Simple)
+```typescript
+userId: uuid('user_id').references(() => users.id),
+branchId: text('branch_id').references(() => branches.id),
+```
+
+### Explicit Foreign Key Constraints (Advanced)
+```typescript
+export const tableName = pgTable(
+  'table_name',
+  {
+    // columns...
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.authUserId],
+      foreignColumns: [authUsers.id],
+      name: 'table_name_auth_user_id_fk',
+    }).onDelete('cascade'),
+    
+    foreignKey({
+      columns: [table.branchId],
+      foreignColumns: [branches.id],
+      name: 'table_name_branch_id_fk',
+    }).onDelete('set null'),
+  ],
+);
+```
+
+## Relations Definition
+Always export relations after the table definition:
+
+### One-to-Many Relations
+```typescript
+export const usersRelations = relations(users, ({ many }) => ({
+  posts: many(posts),
+  userRoles: many(userRoles),
+}));
+```
+
+### Many-to-One Relations
+```typescript
+export const postsRelations = relations(posts, ({ one }) => ({
+  author: one(users, {
+    fields: [posts.userId],
+    references: [users.id],
+  }),
+}));
+```
+
+### Many-to-Many Relations
+```typescript
+export const usersRelations = relations(users, ({ many }) => ({
+  userRoles: many(userRoles),
+}));
+
+export const rolesRelations = relations(roles, ({ many }) => ({
+  userRoles: many(userRoles),
+}));
+
+// Junction table
+export const userRolesRelations = relations(userRoles, ({ one }) => ({
+  user: one(users, {
+    fields: [userRoles.userId],
+    references: [users.id],
+  }),
+  role: one(roles, {
+    fields: [userRoles.roleId],
+    references: [roles.id],
+  }),
+}));
+```
+
+## Complete Example
+```typescript
+import { relations } from 'drizzle-orm';
+import {
+  pgTable,
+  timestamp,
+  text,
+  uuid,
+  boolean,
+  foreignKey,
+} from 'drizzle-orm/pg-core';
+
+import { authUsers } from './auth-users';
+import { branches } from './branches';
+import { DEFAULT_COLUMNS } from '../utils/columns';
+import { userRoles } from './user-roles';
+
+export const users = pgTable(
+  'users',
+  {
+    ...DEFAULT_COLUMNS,
+    deletedAt: timestamp('deleted_at', { precision: 3, withTimezone: true }),
+    branchId: text('branch_id').references(() => branches.id),
+    authUserId: uuid('auth_user_id').unique().notNull(),
+    email: text('email').notNull().unique(),
+    phone: text('phone').unique(),
+    name: text('name'),
+    isActive: boolean('is_active').default(true),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.authUserId],
+      foreignColumns: [authUsers.id],
+      name: 'users_auth_user_id_fk',
+    }).onDelete('cascade'),
+  ],
+);
+
+export const usersRelations = relations(users, ({ many }) => ({
+  userRoles: many(userRoles),
+}));
+```
+
+## Naming Conventions Summary
+- **File names**: `kebab-case.ts` (e.g., `user-roles.ts`)
+- **Table names** (database): `snake_case` (e.g., `user_roles`)
+- **Variable names** (TypeScript): `camelCase` (e.g., `userRoles`)
+- **Column names** (database): `snake_case` (e.g., `created_at`, `user_id`)
+- **Foreign key constraint names**: `{table_name}_{column_name}_fk`
+
+## Best Practices
+1. Always spread `...DEFAULT_COLUMNS` first in table definition
+2. Use descriptive foreign key constraint names
+3. Add appropriate `onDelete` actions (`cascade`, `set null`, `restrict`)
+4. Export both table and relations from the same file
+5. Use `.notNull()` for required fields
+6. Use `.unique()` for unique constraints
+7. Use `.default()` for default values
+8. Group related imports together
+9. Use proper TypeScript types for better IDE support
+10. Add soft delete with `deletedAt` timestamp when needed
