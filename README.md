@@ -1,4 +1,4 @@
-# Starter For React + Bun + Vite + Hono + Supabase + Drizzle
+# Starter For React + Bun + Vite + Hono + Supabase + Drizzle ⚡
 
 To get started, clone/fork this repository and run the following:
 ```bash
