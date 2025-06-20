@@ -1,5 +1,203 @@
 ---
-description:
-globs:
+description: Writing test cases for Hono API
+globs: 
 alwaysApply: false
 ---
+# Server Testing with Hono and Vitest
+
+## Test Structure and Organization
+
+- All server API tests are stored in `server/__tests__/` directory
+- Follow the naming convention: `<NAME_OF_THE_ROUTE>.test.ts`
+- Mirror the route structure in the test directory (e.g., `routes/projects.ts` → `__tests__/routes/projects.test.ts`)
+
+## Test Setup
+
+### Required Imports
+```typescript
+import { describe, test, expect } from "vitest";
+import routeName from "#routes/routeName.ts"; // Use the # alias for route imports
+```
+
+### Basic Test Structure
+```typescript
+describe("RouteName", () => {
+  test("HTTP_METHOD /endpoint", async () => {
+    const res = await routeName.request("/endpoint");
+    expect(res.status).toBe(expectedStatus);
+    // Additional assertions...
+  });
+});
+```
+
+## Request Testing Patterns
+
+### GET Requests
+```typescript
+test("GET /", async () => {
+  const res = await routeName.request("/");
+  expect(res.status).toBe(200);
+  expect(await res.text()).toBe("Expected response");
+});
+
+test("GET /with-params", async () => {
+  const res = await routeName.request("/with-params?param=value");
+  expect(res.status).toBe(200);
+  expect(await res.json()).toEqual({ expected: "object" });
+});
+```
+
+### POST Requests
+```typescript
+test("POST /create", async () => {
+  const res = await routeName.request("/create", {
+    method: "POST",
+    body: JSON.stringify({ data: "value" }),
+    headers: new Headers({ "Content-Type": "application/json" }),
+  });
+  expect(res.status).toBe(201);
+  expect(await res.json()).toEqual({ message: "Created" });
+});
+```
+
+### PUT/PATCH Requests
+```typescript
+test("PUT /update/:id", async () => {
+  const res = await routeName.request("/update/123", {
+    method: "PUT",
+    body: JSON.stringify({ data: "updated" }),
+    headers: new Headers({ "Content-Type": "application/json" }),
+  });
+  expect(res.status).toBe(200);
+});
+```
+
+### DELETE Requests
+```typescript
+test("DELETE /delete/:id", async () => {
+  const res = await routeName.request("/delete/123", {
+    method: "DELETE",
+  });
+  expect(res.status).toBe(204);
+});
+```
+
+## Response Testing Patterns
+
+### Status Code Assertions
+```typescript
+expect(res.status).toBe(200); // Success
+expect(res.status).toBe(201); // Created
+expect(res.status).toBe(400); // Bad Request
+expect(res.status).toBe(404); // Not Found
+expect(res.status).toBe(500); // Server Error
+```
+
+### Response Body Assertions
+```typescript
+// Text responses
+expect(await res.text()).toBe("Expected text");
+
+// JSON responses
+expect(await res.json()).toEqual({ key: "value" });
+
+// Partial JSON matching
+expect(await res.json()).toMatchObject({ key: "value" });
+```
+
+### Header Assertions
+```typescript
+expect(res.headers.get("Content-Type")).toBe("application/json");
+expect(res.headers.get("X-Custom-Header")).toBe("expected-value");
+```
+
+## Advanced Testing Patterns
+
+### Form Data Testing
+```typescript
+test("POST /upload", async () => {
+  const formData = new FormData();
+  formData.append("file", "content");
+  const res = await routeName.request("/upload", {
+    method: "POST",
+    body: formData,
+  });
+  expect(res.status).toBe(201);
+});
+```
+
+### Request Object Testing
+```typescript
+test("POST /complex", async () => {
+  const req = new Request("http://localhost/complex", {
+    method: "POST",
+    body: JSON.stringify({ complex: "data" }),
+    headers: new Headers({ "Content-Type": "application/json" }),
+  });
+  const res = await routeName.request(req);
+  expect(res.status).toBe(200);
+});
+```
+
+## Test Organization Best Practices
+
+1. **Group related tests**: Use `describe` blocks to group related endpoints
+2. **Descriptive test names**: Use format "HTTP_METHOD /endpoint - description"
+3. **Test edge cases**: Include tests for validation errors, not found cases, etc.
+4. **Mock external dependencies**: Mock database calls, external APIs, etc.
+
+### Example Test Structure
+```typescript
+describe("Projects API", () => {
+  describe("GET /projects", () => {
+    test("should return all projects", async () => {
+      // Test implementation
+    });
+    
+    test("should return empty array when no projects", async () => {
+      // Test implementation
+    });
+  });
+  
+  describe("POST /projects", () => {
+    test("should create a new project", async () => {
+      // Test implementation
+    });
+    
+    test("should return 400 for invalid data", async () => {
+      // Test implementation
+    });
+  });
+});
+```
+
+## Error Testing Patterns
+
+### Validation Errors
+```typescript
+test("POST /create - should return 400 for invalid data", async () => {
+  const res = await routeName.request("/create", {
+    method: "POST",
+    body: JSON.stringify({ invalid: "data" }),
+    headers: new Headers({ "Content-Type": "application/json" }),
+  });
+  expect(res.status).toBe(400);
+  expect(await res.json()).toMatchObject({ error: expect.any(String) });
+});
+```
+
+### Not Found Errors
+```typescript
+test("GET /nonexistent - should return 404", async () => {
+  const res = await routeName.request("/nonexistent");
+  expect(res.status).toBe(404);
+});
+```
+
+## Notes
+
+- Use the `#routes/` alias for importing route modules
+- Always use `await` when calling `routeName.request()`
+- Test both success and error scenarios
+- Include assertions for status codes, response bodies, and headers as needed
+- Follow the existing project structure and naming conventions
