@@ -1,0 +1,228 @@
+---
+description: Create hooks for CRUD calls
+globs: 
+alwaysApply: false
+---
+# TanStack Query Hooks with Supabase
+
+## Overview
+Create TanStack Query hooks for Supabase CRUD operations in the `./src/hooks` folder. Each hook file should correspond to a database entity/table and provide comprehensive CRUD functionality.
+
+## File Structure
+- Organize hooks by database entity/table: `./src/hooks/use[EntityName].ts`
+- Example: `./src/hooks/useProjects.ts`, `./src/hooks/useUsers.ts`
+- For hooks with inner joins, place them in the most appropriate entity file
+
+## Required Imports
+```typescript
+import { queryOptions, useQuery, useSuspenseQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { supabase } from '@/utils/supabase'
+import type { Database, Tables, TablesInsert, TablesUpdate } from '@/database.gen'
+```
+
+## Type Definitions
+Define types for each entity using Pick/Omit utilities:
+
+```typescript
+// For a table named 'projects'
+type Project = Tables<'projects'>
+type ProjectInsert = TablesInsert<'projects'>
+type ProjectUpdate = TablesUpdate<'projects'>
+
+// Custom types using Pick/Omit
+type ProjectWithoutId = Omit<Project, 'id'>
+type ProjectCreateInput = Pick<ProjectInsert, 'name' | 'description'>
+type ProjectUpdateInput = Partial<Pick<ProjectUpdate, 'name' | 'description'>>
+```
+
+## Query Options Pattern
+Always create queryOptions first, then use them in hooks:
+
+```typescript
+// Query options for list/get operations
+export const projectsQueryOptions = {
+  all: () => queryOptions({
+    queryKey: ['projects'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+      if (error) throw error
+      return data
+    },
+  }),
+  
+  byId: (id: string) => queryOptions({
+    queryKey: ['projects', id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .eq('id', id)
+        .single()
+      if (error) throw error
+      return data
+    },
+  }),
+}
+```
+
+## Hook Implementation
+
+### Query Hooks
+```typescript
+// List all entities
+export const useProjects = () => {
+  return useQuery(projectsQueryOptions.all())
+}
+
+export const useProjectsSuspense = () => {
+  return useSuspenseQuery(projectsQueryOptions.all())
+}
+
+// Get single entity
+export const useProject = (id: string) => {
+  return useQuery(projectsQueryOptions.byId(id))
+}
+
+export const useProjectSuspense = (id: string) => {
+  return useSuspenseQuery(projectsQueryOptions.byId(id))
+}
+```
+
+### Mutation Hooks
+```typescript
+// Create mutation
+export const useCreateProject = () => {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async (data: ProjectCreateInput) => {
+      const { data: result, error } = await supabase
+        .from('projects')
+        .insert(data)
+        .select()
+        .single()
+      if (error) throw error
+      return result
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+    },
+  })
+}
+
+// Update mutation
+export const useUpdateProject = () => {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: ProjectUpdateInput }) => {
+      const { data: result, error } = await supabase
+        .from('projects')
+        .update(data)
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw error
+      return result
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+      queryClient.invalidateQueries({ queryKey: ['projects', data.id] })
+    },
+  })
+}
+
+// Delete mutation
+export const useDeleteProject = () => {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', id)
+      if (error) throw error
+      return id
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] })
+    },
+  })
+}
+```
+
+## Advanced Patterns
+
+### With Filters and Sorting
+```typescript
+export const projectsQueryOptions = {
+  filtered: (filters: { status?: string; userId?: string }) => queryOptions({
+    queryKey: ['projects', 'filtered', filters],
+    queryFn: async () => {
+      let query = supabase.from('projects').select('*')
+      
+      if (filters.status) {
+        query = query.eq('status', filters.status)
+      }
+      if (filters.userId) {
+        query = query.eq('user_id', filters.userId)
+      }
+      
+      const { data, error } = await query.order('created_at', { ascending: false })
+      if (error) throw error
+      return data
+    },
+  }),
+}
+```
+
+### With Relationships (Inner Joins)
+```typescript
+export const projectsQueryOptions = {
+  withOwner: () => queryOptions({
+    queryKey: ['projects', 'with-owner'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('projects')
+        .select(`
+          *,
+          owner:users(id, name, email)
+        `)
+      if (error) throw error
+      return data
+    },
+  }),
+}
+```
+
+## Naming Conventions
+- Query options: `[entityName]QueryOptions`
+- List hooks: `use[EntityName]` (plural)
+- Single hooks: `use[EntityName]` (singular)
+- Suspense hooks: `use[EntityName]Suspense`
+- Create hooks: `useCreate[EntityName]`
+- Update hooks: `useUpdate[EntityName]`
+- Delete hooks: `useDelete[EntityName]`
+
+## Error Handling
+- Always check for Supabase errors and throw them
+- Let TanStack Query handle error states in components
+- Use consistent error throwing pattern: `if (error) throw error`
+
+## Cache Management
+- Always invalidate relevant queries after mutations
+- Use specific query keys for targeted invalidation
+- Invalidate both list and detail queries when appropriate
+
+## Best Practices
+1. Always create queryOptions before hooks
+2. Use TypeScript types from database.gen.ts
+3. Separate hooks by database entity/table
+4. Provide both regular and suspense query hooks
+5. Include proper cache invalidation in mutations
+6. Use Pick/Omit for custom type definitions
+7. Follow consistent naming conventions
+8. Handle Supabase errors appropriately
